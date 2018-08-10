@@ -1,0 +1,106 @@
+---
+title: "USD data fetch - Paying customers"
+output:
+  html_document:
+    df_print: paged
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+#Adding Libraries
+library("curl")
+library("jsonlite")
+library("httr")
+
+#fetch users from a csv file
+user_list <- read.csv("paying50.csv")
+summary(user_list)
+len = NROW(user_list)
+description = list()
+```
+```{r}
+#Function for POST API call
+plan_disc <- function(user) {
+  
+  #key values
+  app <- "planner"
+  keyPrefix <- "plan-"
+  requestor <- user
+  
+  #authentication
+  sif <-
+    "SIF_HMACSHA256 SE1IX0RNUFM6emFsZXVvbXdaNHp2OG1EaEY1M0JEMUNrMWFDQ0tCLzdCQlJoNENjMzVYZz0K"
+  #Add URL
+  url <-
+    "http://uds.prod.hmheng-uds.brnp.internal/api/v1/data.app.query"
+  
+  #Add key values to body
+  body <- list(app = app,
+               keyPrefix = keyPrefix,
+               requestor = requestor)
+  #POST call
+  r <-
+    POST(url,
+         body = body,
+         encode = "json",
+         add_headers(
+           .headers = c("Authorization" = sif,
+                        "Content-Type" = "application/json")
+         ))
+  
+  #Get content value from the output
+  res <- rawToChar(r$content)
+  #Convert chars to json format
+  result <- fromJSON(res)
+  return(result)
+}
+
+#Create empty data frame for adding description data
+disc_list = data.frame(userid = character(), plan = character(), desc = character() )
+
+j<-1
+k<-1
+for (z in 1:len) {
+  username <- user_list$userId[j]
+  
+  out <- plan_disc(username)
+  val <- out$result$data$meta
+    
+  if(!is.null(val) ){
+    print(out$result$createdBy)
+    print(out$result$data$meta$description)
+    
+    val = out$result$data$meta
+    tab_len = NROW(val)
+    
+    i<-1
+    for (x in 1:tab_len) {
+      disc_list <- rbind(disc_list, data.frame(userid = username,
+                                               plan = toString(val[i,1]),
+                                               desc = toString(val[i,2])
+                                               )
+                         )
+      i<-i+1
+    }
+  } 
+  j<-j+1
+}
+```
+
+```{r}
+#write file to csv
+write.csv(disc_list, file = "500_other.csv")
+
+summary(disc_list)
+disc_list
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
